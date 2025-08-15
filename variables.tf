@@ -72,5 +72,5 @@ variable "kubeconfig_context_name" {
 variable "add_named_context" {
   type        = bool
   description = "Add a new named context instead of updating the default one"
-  default     = true
+  default     = false
 }
