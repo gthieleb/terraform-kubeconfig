@@ -65,13 +65,15 @@ resource "ssh_sensitive_resource" "kubeconfig" {
   # You can also specify 'destroy' to run the commands at destroy time
   when = "create"
 
-  host        = var.remote_host
-  user        = var.remote_user
-  private_key = var.private_key
+  host        = var.bastion_host != null ? var.bastion_host : var.remote_host
+  user        = var.bastion_user != null ? var.bastion_user : var.remote_user
+  private_key = var.bastion_private_key != null ? var.bastion_private_key : var.private_key
 
   timeout = "1m"
 
-  commands = local.remote_command_list
+  commands = var.bastion_host != null ? [
+    "ssh -o StrictHostKeyChecking=no -i ${var.private_key} ${var.remote_user}@${var.remote_host} '${join(" && ", local.remote_command_list)}'"
+  ] : local.remote_command_list
 }
 
 resource "local_sensitive_file" "kubeconfig" {

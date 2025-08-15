@@ -3,6 +3,24 @@ variable "private_key" {
   description = "SSH Key of one of the Kubernetes Master Node"
 }
 
+variable "bastion_host" {
+  type        = string
+  description = "Bastion host to use for SSH tunneling"
+  default     = null
+}
+
+variable "bastion_user" {
+  type        = string
+  description = "SSH user for the bastion host"
+  default     = null
+}
+
+variable "bastion_private_key" {
+  type        = string
+  description = "Private key for SSH access to the bastion host"
+  default     = null
+}
+
 variable "remote_host" {
   type        = string
   description = "Kubernetes Master Node to pull the kubeconfig"
