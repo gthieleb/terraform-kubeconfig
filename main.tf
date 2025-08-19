@@ -11,7 +11,6 @@ locals {
   _master_nodes        = length(var.kubernetes_master_nodes) > 0 ? var.kubernetes_master_nodes : [var.remote_host]
   _master_nodes_joined = join(";", [for node in local._master_nodes : "https://${node}:6443"])
 
-
   _kubeconfig_decoded = yamldecode(ssh_sensitive_resource.kubeconfig.result)
   
   # Apply server replacement if needed
@@ -65,15 +64,18 @@ resource "ssh_sensitive_resource" "kubeconfig" {
   # You can also specify 'destroy' to run the commands at destroy time
   when = "create"
 
-  host        = var.bastion_host != null ? var.bastion_host : var.remote_host
-  user        = var.bastion_user != null ? var.bastion_user : var.remote_user
-  private_key = var.bastion_private_key != null ? var.bastion_private_key : var.private_key
+  bastion_host        = var.bastion_host
+  bastion_user        = var.bastion_user
+  bastion_private_key = var.bastion_private_key
+
+  host        = var.remote_host
+  user        = var.remote_user
+  private_key = var.private_key
 
   timeout = "1m"
 
-  commands = var.bastion_host != null ? [
-    "ssh -o StrictHostKeyChecking=no -i ${var.private_key} ${var.remote_user}@${var.remote_host} '${join(" && ", local.remote_command_list)}'"
-  ] : local.remote_command_list
+  commands = local.remote_command_list
+
 }
 
 resource "local_sensitive_file" "kubeconfig" {
