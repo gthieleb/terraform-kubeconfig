@@ -53,8 +53,8 @@ variable "default_remote_command_list" {
   type        = map(list(string))
   description = "Default commands for kubernetes distribution"
   default = {
-    "k3s"  = ["cat /etc/rancher/k3s/k3s.yaml"]
-    "rke2" = ["cat /etc/rancher/rke2/rke2.yaml"]
+    "k3s"  = ["cloud-init status --wait > /dev/null && cat /etc/rancher/k3s/k3s.yaml"]
+    "rke2" = ["cloud-init status --wait > /dev/null && cat /etc/rancher/rke2/rke2.yaml"]
   }
 }
 
