@@ -1,0 +1,29 @@
+name: Terraform CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (module root)
+        run: terraform init -backend=false
+
+      - name: Terraform validate (module root)
+        run: terraform validate
+
+      - name: Terraform init (example)
+        run: terraform -chdir=examples/named-kubeconfig init -backend=false
+
+      - name: Terraform validate (example)
+        run: terraform -chdir=examples/named-kubeconfig validate
