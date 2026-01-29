@@ -1,18 +1,23 @@
 locals {
-
   remote_command_list = length(var.remote_command_list) > 0 ? var.remote_command_list : var.default_remote_command_list[var.kubernetes_distribution]
 
-  kubeconfig_file_path = (var.kubeconfig_save_file ? var.kubeconfig_file_path != null ?
-    startswith(var.kubeconfig_file_path, "/") || startswith(var.kubeconfig_file_path, "./") ?
-    var.kubeconfig_file_path :
-    pathexpand("~/.kube/${var.kubeconfig_file_path}") :
-  pathexpand("~/.kube/${var.remote_host}-${random_integer.file_sfx.result}") : "")
+  kubeconfig_default_path = pathexpand("~/.kube/${var.remote_host}-${random_integer.file_sfx.result}")
+  kubeconfig_explicit_path = var.kubeconfig_file_path != null ? (
+    startswith(var.kubeconfig_file_path, "/") || startswith(var.kubeconfig_file_path, "./") ? (
+      var.kubeconfig_file_path
+    ) : (
+      pathexpand("~/.kube/${var.kubeconfig_file_path}")
+    )
+  ) : null
+  kubeconfig_file_path = var.kubeconfig_save_file ? (
+    coalesce(local.kubeconfig_explicit_path, local.kubeconfig_default_path)
+  ) : ""
 
   _master_nodes        = length(var.kubernetes_master_nodes) > 0 ? var.kubernetes_master_nodes : [var.remote_host]
   _master_nodes_joined = join(";", [for node in local._master_nodes : "https://${node}:6443"])
 
   _kubeconfig_decoded = yamldecode(ssh_sensitive_resource.kubeconfig.result)
-  
+
   # Apply server replacement if needed
   # We're using the first cluster entry as that's the standard for k3s/rke2 kubeconfig files
   # which typically only have one cluster defined. Both k3s and rke2 generate kubeconfig files
@@ -26,30 +31,45 @@ locals {
       })
     ] : local._kubeconfig_decoded.clusters
   }) : local._kubeconfig_decoded
-  
-  # Apply context name changes if needed
-  # We're adding a new named context rather than renaming the existing one.
-  # This approach has several benefits:
-  # 1. It preserves the original context, which maintains compatibility with tools that expect default names
-  # 2. It adds our custom named context, which is more descriptive and user-friendly
-  # 3. It allows users to switch between contexts as needed using kubectl config use-context
-  # 4. It's safer than replacing the original context which could break existing workflows
-  # 
+
+  # Rename context/user/cluster entries to avoid "default" in output.
+  _kubeconfig_with_renamed_entries = var.kubeconfig_name != null ? merge(local._kubeconfig_with_server, {
+    clusters = [
+      for idx, cluster in try(local._kubeconfig_with_server.clusters, []) :
+      idx == 0 ? merge(cluster, { name = var.kubeconfig_name }) : cluster
+    ]
+    users = [
+      for idx, user in try(local._kubeconfig_with_server.users, []) :
+      idx == 0 ? merge(user, { name = var.kubeconfig_name }) : user
+    ]
+    contexts = [
+      for idx, context in try(local._kubeconfig_with_server.contexts, []) :
+      idx == 0 ? merge(context, {
+        name = var.kubeconfig_name
+        context = merge(try(context.context, {}), {
+          cluster = var.kubeconfig_name
+          user    = var.kubeconfig_name
+        })
+      }) : context
+    ]
+    "current-context" = var.kubeconfig_name
+  }) : local._kubeconfig_with_server
+
+  # Legacy behavior: add a new named context while keeping the existing one.
   _kubeconfig_with_context = var.kubeconfig_context_name != null && var.add_named_context ? (
-    merge(local._kubeconfig_with_server, {
-      # Add a new named context while keeping the original
-      contexts = length(local._kubeconfig_with_server.contexts) > 0 ? concat(
-        local._kubeconfig_with_server.contexts,
+    merge(local._kubeconfig_with_renamed_entries, {
+      contexts = length(try(local._kubeconfig_with_renamed_entries.contexts, [])) > 0 ? concat(
+        try(local._kubeconfig_with_renamed_entries.contexts, []),
         [
           {
             name = var.kubeconfig_context_name
-            context = local._kubeconfig_with_server.contexts[0].context
+            context = local._kubeconfig_with_renamed_entries.contexts[0].context
           }
         ]
-      ) : local._kubeconfig_with_server.contexts
+      ) : try(local._kubeconfig_with_renamed_entries.contexts, [])
     })
-  ) : local._kubeconfig_with_server
-  
+  ) : local._kubeconfig_with_renamed_entries
+
   kubeconfig_content = yamlencode(local._kubeconfig_with_context)
 }
 
@@ -70,6 +90,7 @@ resource "ssh_sensitive_resource" "kubeconfig" {
 
   host        = var.remote_host
   user        = var.remote_user
+  port        = var.remote_port
   private_key = var.private_key
 
   timeout = "1m"
@@ -84,26 +105,4 @@ resource "local_sensitive_file" "kubeconfig" {
   filename        = local.kubeconfig_file_path
   content         = local.kubeconfig_content
   file_permission = "0600"
-}
-
-output "kubeconfig_file_path" {
-  description = "Kubeconfig"
-  sensitive   = true
-  value       = local.kubeconfig_file_path
-}
-
-output "kube_config" {
-  description = "Kubeconfig Encoded"
-  sensitive   = true
-  value       = local.kubeconfig_content
-}
-
-output "config" {
-  description = "Kubeconfig Decoded from YAML"
-  sensitive   = true
-  value       = yamldecode(local.kubeconfig_content)
-}
-
-output "remote_command_list" {
-  value = local.remote_command_list
 }
