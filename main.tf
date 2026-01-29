@@ -2,15 +2,16 @@ locals {
   remote_command_list = length(var.remote_command_list) > 0 ? var.remote_command_list : var.default_remote_command_list[var.kubernetes_distribution]
 
   kubeconfig_default_path = pathexpand("~/.kube/${var.remote_host}-${random_integer.file_sfx.result}")
-  kubeconfig_explicit_path = (
-    var.kubeconfig_file_path != null
-    ? (startswith(var.kubeconfig_file_path, "/") || startswith(var.kubeconfig_file_path, "./")
-      ? var.kubeconfig_file_path
-      : pathexpand("~/.kube/${var.kubeconfig_file_path}")
+  kubeconfig_explicit_path = var.kubeconfig_file_path != null ? (
+    startswith(var.kubeconfig_file_path, "/") || startswith(var.kubeconfig_file_path, "./") ? (
+      var.kubeconfig_file_path
+    ) : (
+      pathexpand("~/.kube/${var.kubeconfig_file_path}")
     )
-    : null
-  )
-  kubeconfig_file_path = var.kubeconfig_save_file ? coalesce(local.kubeconfig_explicit_path, local.kubeconfig_default_path) : ""
+  ) : null
+  kubeconfig_file_path = var.kubeconfig_save_file ? (
+    coalesce(local.kubeconfig_explicit_path, local.kubeconfig_default_path)
+  ) : ""
 
   _master_nodes        = length(var.kubernetes_master_nodes) > 0 ? var.kubernetes_master_nodes : [var.remote_host]
   _master_nodes_joined = join(";", [for node in local._master_nodes : "https://${node}:6443"])
@@ -55,17 +56,19 @@ locals {
   }) : local._kubeconfig_with_server
 
   # Legacy behavior: add a new named context while keeping the existing one.
-  _kubeconfig_with_context = var.kubeconfig_context_name != null && var.add_named_context ? merge(local._kubeconfig_with_renamed_entries, {
-    contexts = length(try(local._kubeconfig_with_renamed_entries.contexts, [])) > 0 ? concat(
-      try(local._kubeconfig_with_renamed_entries.contexts, []),
-      [
-        {
-          name = var.kubeconfig_context_name
-          context = local._kubeconfig_with_renamed_entries.contexts[0].context
-        }
-      ]
-    ) : try(local._kubeconfig_with_renamed_entries.contexts, [])
-  }) : local._kubeconfig_with_renamed_entries
+  _kubeconfig_with_context = var.kubeconfig_context_name != null && var.add_named_context ? (
+    merge(local._kubeconfig_with_renamed_entries, {
+      contexts = length(try(local._kubeconfig_with_renamed_entries.contexts, [])) > 0 ? concat(
+        try(local._kubeconfig_with_renamed_entries.contexts, []),
+        [
+          {
+            name = var.kubeconfig_context_name
+            context = local._kubeconfig_with_renamed_entries.contexts[0].context
+          }
+        ]
+      ) : try(local._kubeconfig_with_renamed_entries.contexts, [])
+    })
+  ) : local._kubeconfig_with_renamed_entries
 
   kubeconfig_content = yamlencode(local._kubeconfig_with_context)
 }
