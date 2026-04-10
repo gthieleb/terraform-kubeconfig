@@ -72,7 +72,7 @@ resource "ssh_sensitive_resource" "kubeconfig" {
   user        = var.remote_user
   private_key = var.private_key
 
-  timeout = "1m"
+  timeout = "5m"
 
   commands = local.remote_command_list
 
