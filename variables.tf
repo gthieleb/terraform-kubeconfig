@@ -27,26 +27,29 @@ variable "remote_host" {
 }
 
 variable "remote_user" {
-  type    = string
-  default = "rancher"
+  type        = string
+  description = "SSH user for the remote host"
+  default     = "rancher"
 }
 
 variable "remote_port" {
-  type    = string
-  default = 22
+  type        = number
+  description = "SSH port for the remote host"
+  default     = 22
 }
 
 variable "remote_command_list" {
   description = <<EOF
-    Default remote commands used to retreive the kubeconfig on the remote system. 
-  EOF  
+    Default remote commands used to retrieve the kubeconfig on the remote system.
+  EOF
   type        = list(string)
   default     = []
 }
 
 variable "kubernetes_distribution" {
-  type    = string
-  default = "k3s"
+  type        = string
+  description = "Kubernetes distribution used to choose default commands"
+  default     = "k3s"
 }
 
 variable "default_remote_command_list" {
@@ -71,8 +74,9 @@ variable "replace_server" {
 }
 
 variable "kubeconfig_save_file" {
-  type    = bool
-  default = false
+  type        = bool
+  description = "Write kubeconfig to a local file"
+  default     = false
 }
 
 variable "kubeconfig_file_path" {
@@ -81,14 +85,20 @@ variable "kubeconfig_file_path" {
   default     = null
 }
 
+variable "kubeconfig_name" {
+  type        = string
+  description = "Base name used to rename context, user, and cluster entries"
+  default     = null
+}
+
 variable "kubeconfig_context_name" {
   type        = string
-  description = "Name to use for the kubeconfig context"
+  description = "Legacy: name to use for an additional context"
   default     = null
 }
 
 variable "add_named_context" {
   type        = bool
-  description = "Add a new named context instead of updating the default one"
+  description = "Legacy: add a new named context instead of updating the default one"
   default     = false
 }
